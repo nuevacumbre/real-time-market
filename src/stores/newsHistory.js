@@ -11,7 +11,21 @@ export const useNewsHistoryStore = defineStore('newsHistory', {
   }),
 
   getters: {
-    getRecentNews: (state) => state.viewedNews.slice(0, 5),
+    getRecentNews: (state) => {
+      // Eliminar duplicados por newsId y mantener solo los más recientes
+      const unique = {}
+      state.viewedNews.forEach((item) => {
+        if (
+          !unique[item.newsId] ||
+          new Date(item.viewedAt) > new Date(unique[item.newsId].viewedAt)
+        ) {
+          unique[item.newsId] = item
+        }
+      })
+      return Object.values(unique)
+        .sort((a, b) => new Date(b.viewedAt) - new Date(a.viewedAt))
+        .slice(0, 5)
+    },
 
     getViewedByUser: (state) => (userId) => {
       return state.viewedNews.filter((item) => item.userId === userId)
@@ -23,7 +37,6 @@ export const useNewsHistoryStore = defineStore('newsHistory', {
     async trackNewsView(newsId, newsTitle, newsCategory) {
       const authStore = useAuthStore()
 
-      // Solo registrar si el usuario está autenticado
       if (!authStore.isAuthenticated) return null
 
       try {
@@ -34,22 +47,23 @@ export const useNewsHistoryStore = defineStore('newsHistory', {
           newsTitle,
           newsCategory,
           viewedAt: new Date().toISOString(),
-          timestamp: new Date(), // Para ordenamiento en Firebase
+          timestamp: new Date(),
         }
 
         // Guardar en Firestore
         const historyCollection = collection(db, 'newsHistory')
         const docRef = await addDoc(historyCollection, viewData)
 
-        // Agregar al estado local
+        // Actualizar estado local eliminando duplicados
+        this.viewedNews = this.viewedNews.filter((item) => item.newsId !== newsId)
         this.viewedNews.unshift({
           id: docRef.id,
           ...viewData,
         })
 
-        // Mantener solo los últimos 20 en memoria
+        // Mantener solo los últimos 20
         if (this.viewedNews.length > 20) {
-          this.viewedNews.pop()
+          this.viewedNews = this.viewedNews.slice(0, 20)
         }
 
         console.log('📝 Vista de noticia registrada:', newsTitle)
@@ -81,12 +95,24 @@ export const useNewsHistoryStore = defineStore('newsHistory', {
         )
 
         const snapshot = await getDocs(q)
-        this.viewedNews = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }))
 
-        console.log(`✅ Historial cargado: ${this.viewedNews.length} noticias`)
+        // Eliminar duplicados por newsId
+        const uniqueMap = {}
+        snapshot.docs.forEach((doc) => {
+          const data = { id: doc.id, ...doc.data() }
+          if (
+            !uniqueMap[data.newsId] ||
+            new Date(data.viewedAt) > new Date(uniqueMap[data.newsId].viewedAt)
+          ) {
+            uniqueMap[data.newsId] = data
+          }
+        })
+
+        this.viewedNews = Object.values(uniqueMap).sort(
+          (a, b) => new Date(b.viewedAt) - new Date(a.viewedAt),
+        )
+
+        console.log(`✅ Historial cargado: ${this.viewedNews.length} noticias únicas`)
       } catch (error) {
         console.error('Error cargando historial:', error)
         this.viewedNews = []

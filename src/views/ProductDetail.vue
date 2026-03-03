@@ -1,13 +1,18 @@
 <template>
   <div class="container" v-if="product">
+    <!-- Notificaciones -->
+    <div v-if="notification.show" class="alert" :class="notification.type" role="alert">
+      <i :class="notification.icon"></i> {{ notification.message }}
+    </div>
+
     <div class="row">
       <div class="col-lg-8">
         <div class="card bg-dark text-white mb-4">
           <div class="card-header">
             <div class="d-flex justify-content-between align-items-center">
-              <h3 class="mb-0">{{ product.nombre }}</h3>
+              <h3 class="mb-0">{{ product.nombre || product.name }}</h3>
               <span class="badge" :class="getSectorBadge(product.sector)">{{
-                product.sector
+                product.sector || 'General'
               }}</span>
             </div>
           </div>
@@ -15,7 +20,7 @@
             <div class="row text-center mb-4">
               <div class="col-6">
                 <h5 class="text-white-50">Símbolo</h5>
-                <h2 class="text-primary">{{ product.simbolo }}</h2>
+                <h2 class="text-primary">{{ product.simbolo || product.symbol }}</h2>
               </div>
               <div class="col-6">
                 <h5 class="text-white-50">Precio Actual</h5>
@@ -31,7 +36,7 @@
               </span>
             </div>
 
-            <!-- Chart -->
+            <!-- Chart con datos reales -->
             <div class="bg-dark p-3 rounded mb-3">
               <div class="d-flex justify-content-between align-items-center mb-3">
                 <h5>Gráfico de Precios</h5>
@@ -50,6 +55,10 @@
                 </div>
               </div>
               <canvas ref="chartCanvas"></canvas>
+              <div v-if="chartLoading" class="text-center py-3">
+                <div class="spinner-border spinner-border-sm text-light"></div>
+                <p class="text-white-50 mt-2">Cargando gráfico...</p>
+              </div>
             </div>
 
             <!-- Technical Indicators -->
@@ -101,7 +110,7 @@
               <li class="list-group-item bg-transparent text-white d-flex justify-content-between">
                 <span>Sector</span>
                 <span class="badge" :class="getSectorBadge(product.sector)">{{
-                  product.sector
+                  product.sector || 'General'
                 }}</span>
               </li>
               <li
@@ -137,7 +146,7 @@
   </div>
 
   <div v-else class="text-center py-5">
-    <div class="spinner-border text-light"></div>
+    <div class="spinner-border text-light" style="width: 3rem; height: 3rem"></div>
     <p class="text-white-50 mt-3">Cargando detalles...</p>
   </div>
 </template>
@@ -160,6 +169,15 @@ const product = ref(null)
 const chartCanvas = ref(null)
 const selectedPeriod = ref('1m')
 const technicalIndicators = ref([])
+const chartLoading = ref(false)
+
+// Sistema de notificaciones
+const notification = ref({
+  show: false,
+  type: 'alert-success',
+  icon: 'bi bi-check-circle',
+  message: '',
+})
 
 const periods = [
   { label: '1M', value: '1m' },
@@ -170,6 +188,19 @@ const periods = [
 
 let chart = null
 
+const showNotification = (message, type = 'success') => {
+  notification.value = {
+    show: true,
+    type: type === 'success' ? 'alert-success' : 'alert-danger',
+    icon: type === 'success' ? 'bi bi-check-circle' : 'bi bi-exclamation-triangle',
+    message,
+  }
+
+  setTimeout(() => {
+    notification.value.show = false
+  }, 3000)
+}
+
 const loadProduct = async () => {
   try {
     const symbol = route.params.symbol
@@ -178,27 +209,27 @@ const loadProduct = async () => {
       router.push('/market')
       return
     }
-    // Buscar en MARKET_SYMBOLS primero
-    // const fromConstants = MARKET_SYMBOLS.find((s) => s.symbol === route.params.symbol)
+
     const fromConstants = MARKET_SYMBOLS.find((s) => s.symbol === symbol)
 
     if (fromConstants) {
       product.value = {
         ...fromConstants,
+        nombre: fromConstants.name,
+        simbolo: fromConstants.symbol,
         precio: 100.0 + Math.random() * 100,
         variacion: parseFloat((Math.random() * 10 - 5).toFixed(2)),
         volumen: Math.floor(Math.random() * 10000000),
         timestamp: new Date().toISOString(),
       }
 
-      // Add to history
       historyStore.addToHistory({
         type: 'view',
         product: product.value,
         timestamp: new Date().toISOString(),
       })
 
-      // Load historical data for chart
+      // Cargar datos históricos y técnicos
       loadHistoricalData()
       loadTechnicalIndicators()
     } else {
@@ -212,13 +243,14 @@ const loadProduct = async () => {
 }
 
 const loadHistoricalData = async () => {
-  if (!product.value) return
+  if (!product.value || !product.value.simbolo) return
+
+  chartLoading.value = true
 
   try {
     const historicalData = await getDailyTimeSeries(product.value.simbolo)
 
     if (historicalData.length && chartCanvas.value) {
-      // Filtrar por período seleccionado
       let filteredData = historicalData
       const today = new Date()
 
@@ -283,11 +315,13 @@ const loadHistoricalData = async () => {
     }
   } catch (error) {
     console.error('Error loading historical data:', error)
+  } finally {
+    chartLoading.value = false
   }
 }
 
 const loadTechnicalIndicators = async () => {
-  if (!product.value) return
+  if (!product.value || !product.value.simbolo) return
 
   try {
     const sma20 = await getSMA(product.value.simbolo, 'daily', 20)
@@ -331,13 +365,12 @@ const changePeriod = (period) => {
 }
 
 const formatPrice = (price) => {
-  return new Intl.NumberFormat('es-CL', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(price)
+  if (price === undefined || price === null || isNaN(price)) return '0.00'
+  return new Intl.NumberFormat('es-CL', { minimumFractionDigits: 2 }).format(price)
 }
 
 const formatVolume = (volume) => {
+  if (!volume) return '0'
   if (volume >= 1000000) {
     return (volume / 1000000).toFixed(1) + 'M'
   } else if (volume >= 1000) {
@@ -347,6 +380,7 @@ const formatVolume = (volume) => {
 }
 
 const formatTime = (timestamp) => {
+  if (!timestamp) return 'N/A'
   return new Date(timestamp).toLocaleTimeString('es-CL')
 }
 
@@ -364,31 +398,38 @@ const getSectorBadge = (sector) => {
 const handleBuy = () => {
   if (product.value) {
     portfolioStore.addToPortfolio(product.value)
-    historyStore.addToHistory({
-      type: 'buy',
-      product: product.value,
-      timestamp: new Date().toISOString(),
-    })
+    showNotification(
+      `✅ Compra realizada: 1 acción de ${product.value.simbolo} a $${formatPrice(product.value.precio)}`,
+      'success',
+    )
   }
 }
 
 const handleSell = () => {
   if (product.value) {
-    portfolioStore.removeFromPortfolio(product.value.simbolo)
-    historyStore.addToHistory({
-      type: 'sell',
-      product: product.value,
-      timestamp: new Date().toISOString(),
-    })
+    const result = portfolioStore.removeFromPortfolio(product.value.simbolo)
+    if (result) {
+      showNotification(
+        `✅ Venta realizada: 1 acción de ${product.value.simbolo} a $${formatPrice(product.value.precio)}`,
+        'success',
+      )
+    } else {
+      showNotification(`❌ No tienes acciones de ${product.value.simbolo} para vender`, 'error')
+    }
   }
 }
 
 const addToWatchlist = () => {
-  alert('Funcionalidad en desarrollo')
+  showNotification('⭐ Función de Watchlist en desarrollo. Pronto disponible.', 'info')
 }
 
 const goToNews = () => {
-  router.push(`/news?q=${product.value?.nombre}`)
+  const searchTerm = product.value?.nombre || product.value?.name || product.value?.simbolo || ''
+  if (searchTerm) {
+    router.push(`/news?q=${encodeURIComponent(searchTerm)}`)
+  } else {
+    router.push('/news')
+  }
 }
 
 onMounted(() => {
@@ -412,5 +453,25 @@ canvas {
 .btn-sm {
   font-size: 0.75rem;
   padding: 0.25rem 0.5rem;
+}
+
+.alert {
+  position: fixed;
+  top: 80px;
+  right: 20px;
+  z-index: 1000;
+  min-width: 300px;
+  animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
 }
 </style>

@@ -41,7 +41,7 @@ const sampleNews = [
       <p>Expertos de la CEPAL sugieren que este conflicto podría reducir el crecimiento de América Latina en 0.5 puntos porcentuales durante 2025.</p>
     `,
     category: 'Política',
-    imageUrl: 'https://images.unsplash.com/photo-1542810634-71277ad95c5d?w=800',
+    imageUrl: 'https://images.unsplash.com/photo-1581291881321-56dee1d7d4e1?q=80',
     author: 'Christopher Espinoza',
     publishedAt: new Date().toISOString(),
     views: 0,
@@ -78,7 +78,7 @@ const sampleNews = [
       <p>El ministro de Hacienda declaró: "Este es el momento de Chile. Tenemos los recursos que el mundo necesita y la oportunidad de dar un salto al desarrollo".</p>
     `,
     category: 'Política',
-    imageUrl: 'https://images.unsplash.com/photo-1589908803800-74aaba529547?w=800',
+    imageUrl: 'https://images.unsplash.com/photo-1640119840422-39e232dd4eb5?q=80',
     author: 'Christopher Espinoza',
     publishedAt: new Date(Date.now() - 86400000).toISOString(), // Ayer
     views: 0,

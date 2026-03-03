@@ -21,7 +21,7 @@
       </div>
     </div>
 
-    <div class="row mt-4">
+    <div class="row">
       <!-- Portfolio Summary -->
       <div class="col-md-6 mb-4">
         <div class="card bg-dark text-white h-100">
@@ -116,13 +116,15 @@
             </div>
           </div>
         </div>
-
+      </div>
+      <!-- News History -->
+      <div class="mt-4">
         <NewsHistory title="Mis Últimas Lecturas" />
       </div>
     </div>
 
     <!-- Recently Viewed Products -->
-    <div class="row" v-if="recentProducts.length > 0">
+    <div class="row mt-4" v-if="recentProducts.length > 0">
       <div class="col-12">
         <div class="card bg-dark text-white">
           <div class="card-header">
@@ -135,7 +137,8 @@
                 v-for="item in recentProducts"
                 :key="item?.product?.simbolo || Math.random()"
               >
-                <!--ProductCard :product="item.product" /-->
+                <!-- IMPORTANTE: Descomentar ProductCard -->
+                <ProductCard :product="item.product" />
               </div>
             </div>
           </div>
@@ -167,20 +170,21 @@ import { usePortfolioStore } from '@/stores/portfolio'
 import { useHistoryStore } from '@/stores/history'
 import { useNewsHistoryStore } from '@/stores/newsHistory'
 import { useRouter } from 'vue-router'
-//import ProductCard from '@/components/ProductCard.vue'
+// IMPORTANTE: Descomentar ProductCard
+import ProductCard from '@/components/ProductCard.vue'
 import NewsHistory from '@/components/NewsHistory.vue'
 
 const authStore = useAuthStore()
 const portfolioStore = usePortfolioStore()
 const historyStore = useHistoryStore()
-const newsHistoryStore = useNewsHistoryStore() // Aseguramos que el store de historial de noticias también esté disponible para cargar el historial de lectura
+const newsHistoryStore = useNewsHistoryStore()
 const router = useRouter()
 
 const lastAccess = ref(new Date().toLocaleString('es-CL'))
 
 const portfolio = computed(() => ({
-  items: portfolioStore.items,
-  totalValue: portfolioStore.totalValue,
+  items: portfolioStore.items || [],
+  totalValue: portfolioStore.totalValue || 0,
 }))
 
 const recentTransactions = computed(() => {
@@ -190,28 +194,20 @@ const recentTransactions = computed(() => {
 const recentProducts = computed(() => {
   try {
     return (historyStore.getRecentProducts || [])
-      .filter((item) => item && item.product) // Filtrar items válidos
+      .filter((item) => item && item.product)
       .map((item) => ({
         ...item,
         product: {
           ...item.product,
-          precio: item.product.precio || 100, // Valor por defecto
-          variacion: item.product.variacion || 0, // Valor por defecto
+          precio: item.product.precio || 100 + Math.random() * 100,
+          variacion: item.product.variacion || parseFloat((Math.random() * 10 - 5).toFixed(2)),
         },
       }))
   } catch (error) {
     console.error('Error cargando productos recientes:', error)
     return []
   }
-  //return historyStore.getRecentProducts
 })
-
-/*const formatPrice = (price) => {
-  return new Intl.NumberFormat('es-CL', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(price)
-}*/
 
 const formatPrice = (price) => {
   if (price === undefined || price === null || isNaN(price)) return '0.00'

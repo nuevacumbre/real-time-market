@@ -40,9 +40,6 @@
       </div>
 
       <div class="col-lg-4">
-        <!-- Reemplazar la sección de Recently Viewed con el nuevo componente TODO: BORRAR RECENTLY VIEW -->
-        <NewsHistory title="Mi Historial de Lectura" />
-
         <!-- Recently Viewed -->
         <div class="card bg-dark text-white mb-4">
           <div class="card-header">
@@ -54,15 +51,20 @@
             </div>
             <ul v-else class="list-unstyled">
               <li v-for="item in recentlyViewed" :key="item.id" class="mb-2">
-                <router-link :to="`/news/${item.id}`" class="text-white-50 text-decoration-none">
-                  📰 {{ item.title.substring(0, 40) }}...
+                <router-link
+                  v-if="item && item.id"
+                  :to="`/news/${item.id}`"
+                  class="text-white-50 text-decoration-none"
+                >
+                  📰 {{ item.title ? item.title.substring(0, 40) + '...' : 'Noticia sin título' }}
                 </router-link>
+                <span v-else class="text-white-50">📰 Noticia no disponible</span>
               </li>
             </ul>
           </div>
         </div>
 
-        <!-- Market Summary - AHORA USA ALPHA VANTAGE -->
+        <!-- Market Summary -->
         <div class="card bg-dark text-white">
           <div class="card-header">
             <h5 class="mb-0"><i class="bi bi-graph-up"></i> Resumen de Mercado</h5>
@@ -94,9 +96,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import NewsCard from '@/components/NewsCard.vue'
-import NewsHistory from '@/components/NewsHistory.vue'
 import { fetchNews } from '@/services/newsApi'
-// 🔴 IMPORTANTE: Cambiamos de stockApi a alphaVantageApi
 import { fetchMarketData } from '@/services/alphaVantageApi'
 import { NEWS_CATEGORIES, STORAGE_KEYS } from '@/config/constants'
 
@@ -113,18 +113,25 @@ const filteredNews = computed(() => {
 })
 
 const recentlyViewed = computed(() => {
-  const saved = localStorage.getItem(STORAGE_KEYS.RECENTLY_VIEWED)
-  if (saved) {
-    try {
-      return JSON.parse(saved)
+  try {
+    const saved = localStorage.getItem(STORAGE_KEYS.RECENTLY_VIEWED)
+    if (saved) {
+      const parsed = JSON.parse(saved)
+      // Filtrar items válidos y mapear a formato de noticia
+      return parsed
+        .filter((item) => item && item.product)
+        .map((item) => ({
+          id: item.product?.id || item.product?.simbolo,
+          title: item.product?.title || item.product?.nombre || 'Noticia',
+          category: item.product?.category || 'General',
+        }))
         .slice(0, 5)
-        .map((item) => item.product)
-    } catch (e) {
-      console.error('Error parsing recently viewed from localStorage FROM NewsPage.vue:', e)
-      return []
     }
+    return []
+  } catch (e) {
+    console.error('Error parsing recently viewed:', e)
+    return []
   }
-  return []
 })
 
 const loadData = async () => {
@@ -134,7 +141,7 @@ const loadData = async () => {
     allNews.value = newsData
     console.log('✅ Noticias cargadas:', newsData.length)
 
-    // Cargar datos de mercado desde Alpha Vantage (SIN CORS)
+    // Cargar datos de mercado desde Alpha Vantage
     const market = await fetchMarketData()
     marketData.value = market
     console.log('✅ Datos de mercado cargados:', market.length)

@@ -14,6 +14,7 @@ dist-ssr
 coverage
 *.local
 .env
+public/populate-news.html
 
 # Editor directories and files
 .vscode/*

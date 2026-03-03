@@ -20,7 +20,7 @@
         <p class="text-white-50 mt-2">Cargando historial...</p>
       </div>
 
-      <div v-else-if="history.length === 0" class="text-center text-white-50 py-3">
+      <div v-else-if="uniqueHistory.length === 0" class="text-center text-white-50 py-3">
         <i class="bi bi-bookmark fs-1"></i>
         <p class="mt-2">No has visto ninguna noticia aún</p>
         <router-link to="/news" class="btn btn-primary btn-sm">
@@ -29,7 +29,11 @@
       </div>
 
       <ul v-else class="list-unstyled">
-        <li v-for="item in history" :key="item.id" class="mb-3 pb-2 border-bottom border-secondary">
+        <li
+          v-for="item in uniqueHistory"
+          :key="item.id"
+          class="mb-3 pb-2 border-bottom border-secondary"
+        >
           <router-link :to="`/news/${item.newsId}`" class="text-decoration-none">
             <small class="text-white-50 d-block mb-1">
               <i class="bi bi-clock"></i> {{ formatDate(item.viewedAt) }}
@@ -62,7 +66,18 @@ defineProps({
   },
 })
 
-const history = computed(() => newsHistoryStore.getRecentNews)
+// Eliminar duplicados por newsId en el componente también
+const uniqueHistory = computed(() => {
+  const items = newsHistoryStore.getRecentNews || []
+  const unique = {}
+  items.forEach((item) => {
+    if (!unique[item.newsId] || new Date(item.viewedAt) > new Date(unique[item.newsId].viewedAt)) {
+      unique[item.newsId] = item
+    }
+  })
+  return Object.values(unique).sort((a, b) => new Date(b.viewedAt) - new Date(a.viewedAt))
+})
+
 const loading = computed(() => newsHistoryStore.loading)
 
 const formatDate = (date) => {

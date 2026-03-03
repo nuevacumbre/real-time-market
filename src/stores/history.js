@@ -10,30 +10,29 @@ export const useHistoryStore = defineStore('history', {
   getters: {
     getRecentProducts: (state) => {
       return state.recentlyViewed
-        .filter((item) => item && item.product) // Filtrar items válidos
+        .filter((item) => item && item.product)
         .map((item) => ({
           ...item,
           product: {
             ...item.product,
-            // Asegurar que precio y variación tengan valores por defecto
-            precio: item.product.precio || 0,
-            variacion: item.product.variacion || 0,
+            // SOLO asignar valores por defecto si NO existen
+            nombre: item.product.nombre || item.product.name || 'Producto',
+            simbolo: item.product.simbolo || item.product.symbol || 'N/A',
+            precio: item.product.precio ?? 100,
+            variacion: item.product.variacion ?? 0,
           },
         }))
         .slice(0, APP_CONFIG.maxRecentlyViewed)
     },
 
     getRecentTransactions: (state) => {
-      return state.transactions
-        .filter((t) => t) // Filtrar transacciones nulas
-        .slice(0, 10)
+      return state.transactions.filter((t) => t).slice(0, 10)
     },
   },
 
   actions: {
     loadFromStorage() {
       try {
-        // Load recently viewed
         const saved = localStorage.getItem(STORAGE_KEYS.RECENTLY_VIEWED)
         if (saved) {
           const parsed = JSON.parse(saved)
@@ -50,17 +49,14 @@ export const useHistoryStore = defineStore('history', {
     addToHistory(item) {
       if (!item || !item.type) return
 
-      // Add to recently viewed
       if (item.type === 'view' && item.product) {
-        // Validar que el producto tenga los campos necesarios
-        const validProduct = {
-          ...item.product,
-          precio: item.product.precio || 100 + Math.random() * 100,
-          variacion: item.product.variacion || parseFloat((Math.random() * 10 - 5).toFixed(2)),
-        }
+        // NO modificar los nombres, mantener los originales
+        const validProduct = { ...item.product }
 
         const existingIndex = this.recentlyViewed.findIndex(
-          (v) => v.product?.simbolo === validProduct.simbolo,
+          (v) =>
+            v.product?.simbolo === validProduct.simbolo ||
+            v.product?.symbol === validProduct.simbolo,
         )
 
         if (existingIndex !== -1) {
@@ -72,12 +68,10 @@ export const useHistoryStore = defineStore('history', {
           timestamp: item.timestamp || new Date().toISOString(),
         })
 
-        // Keep only max items
-        if (this.recentlyViewed.length > APP_CONFIG.maxRecentlyViewed * 2) {
+        if (this.recentlyViewed.length > APP_CONFIG.maxRecentlyViewed) {
           this.recentlyViewed = this.recentlyViewed.slice(0, APP_CONFIG.maxRecentlyViewed)
         }
 
-        // Guardar en localStorage
         try {
           localStorage.setItem(STORAGE_KEYS.RECENTLY_VIEWED, JSON.stringify(this.recentlyViewed))
         } catch (error) {
@@ -85,10 +79,8 @@ export const useHistoryStore = defineStore('history', {
         }
       }
 
-      // Add to transactions
       if (item.type === 'buy' || item.type === 'sell') {
         this.transactions.unshift(item)
-
         if (this.transactions.length > 50) {
           this.transactions = this.transactions.slice(0, 50)
         }

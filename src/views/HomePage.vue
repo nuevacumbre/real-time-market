@@ -13,6 +13,13 @@
           <router-link to="/news" class="btn btn-outline-light btn-lg px-4">
             Leer Noticias
           </router-link>
+          <router-link
+            v-if="!authStore.isAuthenticated"
+            to="/register"
+            class="btn btn-success btn-lg px-4"
+          >
+            <i class="bi bi-person-plus"></i> Registrarse
+          </router-link>
         </div>
       </div>
     </div>
@@ -70,7 +77,22 @@ const recentProducts = computed(() => {
   try {
     const items = historyStore.getRecentProducts || []
     // Filtrar items que tengan product definido
-    return items.filter((item) => item && item.product)
+    //return items.filter((item) => item && item.product)
+    // Asegurar que los productos tengan todos los datos necesarios
+    return items
+      .filter((item) => item && item.product)
+      .map((item) => ({
+        ...item,
+        product: {
+          ...item.product,
+          // Valores por defecto si faltan
+          nombre: item.product.nombre || 'Producto',
+          simbolo: item.product.simbolo || 'N/A',
+          precio: item.product.precio || 100,
+          variacion: item.product.variacion || 0,
+          sector: item.product.sector || 'General',
+        },
+      }))
   } catch (error) {
     console.error('Error cargando productos recientes:', error)
     return []
